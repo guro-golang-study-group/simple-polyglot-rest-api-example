@@ -1,0 +1,14 @@
+{
+  "name": "typescript",
+  "version": "1.0.0",
+  "main": "main.js",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc main",
+    "start": "yarn run build && node main"
+  },
+  "devDependencies": {
+    "typescript": "^3.2.4",
+    "yarn": "^1.13.0"
+  }
+}
