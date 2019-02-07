@@ -1,43 +1,84 @@
-import { createServer, IncomingMessage, ServerResponse, Server } from 'http'
-import { parse, UrlWithStringQuery } from 'url'
+import { createServer, IncomingMessage, ServerResponse, } from 'http'
+import { parse, UrlWithStringQuery, } from 'url'
 
-const helloWorldHandler = (req: IncomingMessage, res: ServerResponse, name: string) => {
-  switch (req.method) {
-    case "GET":
-      res.write(`Hello ${name}`)
-      break
-    default:
-      res.statusCode = 404
+enum Method {
+  GET, POST, // ...
+}
+
+type Handler = (req: IncomingMessage, res: ServerResponse) => void
+
+class Router {
+  public constructor(private method: Method, private path: string, private handler: Handler) { }
+
+  public isAllow(method: string, path: string): boolean {
+    return this.isAllowMethod(method) && this.isAllowPath(path)
+  }
+
+  public get handle(): Handler {
+    return this.handler
+  }
+
+  private isAllowMethod(method: string): boolean {
+    return Method[this.method] === method 
+  }
+  private isAllowPath(path: string): boolean {
+    const url: UrlWithStringQuery = parse(path)
+    return url.path.startsWith(this.path)
+  }
+}
+
+class Server {
+  private routers: Router[] = []
+  private middlewares: Handler[] = []
+
+  public middleware(middleware: Handler): Server {
+    this.middlewares.push(middleware)
+    return this
+  }
+  public get(path: string, handler: Handler): Server {
+    this.routers.push(new Router(Method.GET, path, handler))
+    return this
+  }
+  public post(path: string, handler: Handler): Server {
+    this.routers.push(new Router(Method.POST, path, handler))
+    return this
+  }
+
+  public listen(port: number): void {
+    createServer((req, res) => { this.route(req, res) }).listen(port, () => console.info(`Server running at http://localhost:${port}/`))
+  }
+
+  private route(req: IncomingMessage, res: ServerResponse): void {
+    this.middlewares.forEach(middleware => middleware(req, res))
+
+    let handler: Handler
+    for (const i in this.routers) {
+      const router: Router = this.routers[i]
+      if (!router.isAllow(req.method, req.url)) {
+        continue
+      }
+      
+      handler = router.handle
       break
     }
 
+    // 404 not found
+    if (!handler) {
+      handler = (_, res: ServerResponse) => res.statusCode = 404
+    }
+
+    handler(req, res)
     res.end()
+  }
 }
 
-const loggingMiddleware = (req: IncomingMessage, res: ServerResponse, next: (req: IncomingMessage, res: ServerResponse, name: string) => void, options: string) => {
-    console.log("logging...")
-    next(req, res, options)
-}
+const loggingMiddleware: Handler = (req: IncomingMessage, res: ServerResponse) => console.info('logging...')
+const helloWorldHandler: Handler = (req: IncomingMessage, res: ServerResponse) => res.write('Hello World')
 
-const router = (req: IncomingMessage, res: ServerResponse) => {
-  // GET /hello/{name}
-  const parsedUrl: UrlWithStringQuery = parse(req.url)
-  // path: /a/b/c => ['', a, b, c]
-  // path: / => ["",""]
-  const splitedPath: string[] = parsedUrl.path.split("/")
-    
-  const firstDepthAction: string = splitedPath[1]
-  switch (firstDepthAction) {
-    case "hello":
-      const helloNameParams: string = splitedPath[2]
-      loggingMiddleware(req, res, helloWorldHandler, helloNameParams)
-      break
-    default:
-      res.statusCode = 404
-      res.end()
-      break
-    }
-}
+//
+//
 
-const server: Server = createServer(router)
-server.listen(8000)
+new Server().middleware(loggingMiddleware)
+  .get('/get', helloWorldHandler)
+  .post('/post', helloWorldHandler)
+  .listen(8000)

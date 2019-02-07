@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+  "target": "es6",
+  "module": "amd",
+  "declaration": true,
+  "noImplicitAny": false,
+  "noResolve": true,
+  "removeComments": true,
+  "noLib": false,
+  "emitDecoratorMetadata": true,
+  "experimentalDecorators": true
+  }
+}
